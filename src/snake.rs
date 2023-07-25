@@ -1,36 +1,46 @@
-#![allow(dead_code)]
+#![allow(dead_code, unused, clippy::module_name_repetitions, clippy::needless_pass_by_value)]
 
 use std::time::Duration;
 
-use bevy::{prelude::*, time::common_conditions::on_timer};
+use bevy::{app::AppExit, prelude::*, time::common_conditions::on_timer};
 
 use crate::{
 	coord_to_pos, pos_to_coord, rand_int_range, Food, Player, Point, Snake, TailSegment, COUNT,
-	HEIGHT, TAIL_COLOR, TAIL_COLOR_MIN, TAIL_SIZE, TAIL_SIZE_MIN, TILE_COLOR, TILE_SIZE, WIDTH,
+	HEAD_COLOR, HEIGHT, TAIL_COLOR, TAIL_COLOR_MIN, TAIL_SIZE, TAIL_SIZE_MIN, TILE_SIZE, WIDTH,
 };
 
 pub struct SnakePlugin;
 
 impl Plugin for SnakePlugin {
 	fn build(&self, app: &mut App) {
-		app.add_startup_system(spawn_player_system)
-			.add_system(keyboard_input_system)
-			.add_system(snake_movment_system.run_if(on_timer(Duration::from_secs_f32(0.08))));
+		app.add_systems(Startup, spawn_player_system).add_systems(
+			Update,
+			(
+				keyboard_input_system,
+				snake_movment_system.run_if(on_timer(Duration::from_secs_f32(0.08))),
+			),
+		);
 	}
 }
 
-fn color_lerp(color1: Color, color2: Color, t: f32) -> Color {
-	let r = color1.r() * (1.0 - t) + color2.r() * t;
-	let g = color1.g() * (1.0 - t) + color2.g() * t;
-	let b = color1.b() * (1.0 - t) + color2.b() * t;
-	let a = color1.a() * (1.0 - t) + color2.a() * t;
-	Color::rgba(r, g, b, a)
+fn time_passed(t: f32) -> impl FnMut(Local<f32>, Res<Time>) -> bool {
+	move |mut timer: Local<f32>, time: Res<Time>| {
+		// Tick the timer
+		*timer += time.delta_seconds();
+		// Return true if the timer has passed the time
+		*timer >= t
+	}
+}
+
+fn map_range(from_range: (f32, f32), to_range: (f32, f32), s: f32) -> f32 {
+	to_range.0 + (s - from_range.0) * (to_range.1 - to_range.0) / (from_range.1 - from_range.0)
 }
 
 fn snake_movment_system(
 	mut snake: ResMut<Snake>,
 	mut player_query: Query<&mut Transform, (With<Player>, Without<Food>)>,
 	mut food_query: Query<&mut Transform, With<Food>>,
+	mut exit_events: EventWriter<AppExit>,
 	tail_query: Query<Entity, With<TailSegment>>,
 	mut commands: Commands,
 ) {
@@ -81,6 +91,17 @@ fn snake_movment_system(
 		}
 	}
 
+	if snake.tail.contains(&Point {
+		x: player_x,
+		y: player_y,
+	}) {
+		snake.len = 5;
+	}
+
+	if snake.len == (3 * 3) {
+		exit_events.send(AppExit);
+	}
+
 	snake.tail.push(Point {
 		x: player_x,
 		y: player_y,
@@ -93,25 +114,22 @@ fn snake_movment_system(
 		commands.entity(entity).despawn_recursive();
 	}
 
-	use bevy::prelude::*;
-
 	let num_segments = snake.tail.len();
-	let tail_size_step = (TAIL_SIZE - TAIL_SIZE_MIN) / (num_segments - 1) as f32; // Calculate the size step between segments
+	let tail_size_step = (TAIL_SIZE - TAIL_SIZE_MIN) / (num_segments - 1) as f32;
 
-	let tail_color_step_r = (TAIL_COLOR.r() - TAIL_COLOR_MIN.r()) / (num_segments - 1) as f32; // Calculate the color step for the red component
-	let tail_color_step_g = (TAIL_COLOR.g() - TAIL_COLOR_MIN.g()) / (num_segments - 1) as f32; // Calculate the color step for the green component
-	let tail_color_step_b = (TAIL_COLOR.b() - TAIL_COLOR_MIN.b()) / (num_segments - 1) as f32; // Calculate the color step for the blue component
+	let tail_color_step_r = (TAIL_COLOR.r() - TAIL_COLOR_MIN.r()) / (num_segments - 1) as f32;
+	let tail_color_step_g = (TAIL_COLOR.g() - TAIL_COLOR_MIN.g()) / (num_segments - 1) as f32;
+	let tail_color_step_b = (TAIL_COLOR.b() - TAIL_COLOR_MIN.b()) / (num_segments - 1) as f32;
 
 	for (index, point) in snake.tail.iter().enumerate() {
 		let (seg_x, seg_y) = (pos_to_coord(point.x), pos_to_coord(point.y));
-		let tail_scale = TAIL_SIZE - tail_size_step * (num_segments - index - 1) as f32; // Calculate the scale for this segment in reverse order
+		let tail_scale = TAIL_SIZE - tail_size_step * (num_segments - index - 1) as f32;
 
-		let color_factor = index as f32 / (num_segments - 1) as f32; // Calculate the color factor based on the index of the segment
 		let tail_color = Color::rgb(
-			TAIL_COLOR.r() - tail_color_step_r * color_factor,
-			TAIL_COLOR.g() - tail_color_step_g * color_factor,
-			TAIL_COLOR.b() - tail_color_step_b * color_factor,
-		); // Calculate the color for this segment based on the color factor
+			tail_color_step_r.mul_add(index as f32 + 1., TAIL_COLOR_MIN.r()),
+			tail_color_step_g.mul_add(index as f32 + 1., TAIL_COLOR_MIN.g()),
+			tail_color_step_b.mul_add(index as f32 + 1., TAIL_COLOR_MIN.b())
+		);
 
 		commands.spawn((
 			SpriteBundle {
@@ -174,7 +192,7 @@ fn spawn_player_system(mut commands: Commands) {
 				..default()
 			},
 			sprite: Sprite {
-				color: TILE_COLOR,
+				color: HEAD_COLOR,
 				..default()
 			},
 			..default()

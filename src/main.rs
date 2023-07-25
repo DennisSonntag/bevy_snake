@@ -9,16 +9,19 @@ mod components;
 mod food;
 mod snake;
 
-const HEIGHT: f32 = 900.;
-const WIDTH: f32 = 900.;
+const HEIGHT: f32 = 1000.;
+const WIDTH: f32 = 1000.;
 const COUNT: i32 = 20;
 const SIZE: f32 = HEIGHT / COUNT as f32;
 const TILE_SIZE: Vec3 = Vec3::new(SIZE, SIZE, 0.0);
 const TAIL_SIZE: Vec3 = Vec3::new(SIZE - 2., SIZE - 2., 0.0);
 const TAIL_SIZE_MIN: Vec3 = Vec3::new(SIZE - 10., SIZE - 10., 0.0);
-const TILE_COLOR: Color = Color::rgb(0.0, 1.0, 0.0);
-const TAIL_COLOR: Color = Color::rgb(0.0, 0.0, 1.0);
-const TAIL_COLOR_MIN: Color = Color::rgb(0.5, 0.0, 1.0);
+
+const HEAD_COLOR: Color = Color::rgb(0.0, 1.0, 0.0);
+
+const TAIL_COLOR: Color = Color::rgb(0.0, 1.0, 0.0);
+const TAIL_COLOR_MIN: Color = Color::rgb(0.0, 0.0, 1.0);
+
 const FOOD_COLOR: Color = Color::rgb(1.0, 0.0, 0.0);
 const FIXED_TIMESTEP: f32 = 0.5;
 
@@ -56,23 +59,21 @@ impl FromWorld for Snake {
 
 fn main() {
 	App::new()
-		.insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
+		.insert_resource(ClearColor(Color::rgb(0.4098, 0.4059, 0.4333)))
 		.add_plugins(DefaultPlugins.set(WindowPlugin {
 			primary_window: Some(Window {
 				title: "snake".into(),
 				resolution: (WIDTH, HEIGHT).into(),
 				present_mode: PresentMode::AutoVsync,
-				// Tells wasm to resize the window according to the available canvas
 				fit_canvas_to_parent: true,
-				// Tells wasm not to override default event handling, like F5, Ctrl+R etc.
 				prevent_default_event_handling: false,
 				..default()
 			}),
 			..default()
 		}))
-		.add_plugin(FoodPlugin)
-		.add_plugin(SnakePlugin)
-		.add_startup_system(setup_system)
+		.add_plugins(FoodPlugin)
+		.add_plugins(SnakePlugin)
+		.add_systems(Startup, setup_system)
 		.init_resource::<Snake>()
 		.run();
 }

@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#![allow(dead_code, unused, clippy::module_name_repetitions)]
 
 use bevy::prelude::*;
 
@@ -8,7 +8,7 @@ pub struct FoodPlugin;
 
 impl Plugin for FoodPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_startup_system(spawn_food_system);
+		app.add_systems(Startup, spawn_food_system);
 	}
 }
 
